@@ -16,9 +16,12 @@
  *
  * You should have received a copy of the GNU General Public License along
  * with this program.  If not, see <http://www.gnu.org/licenses/>.
+ * month of may
  */
 #include "transaction.h"
 #include "../auxi/ptrcontainer.h"
+#include <stdint.h>
+#include <stdbool.h>
 
 AK_transaction_list LockTable[NUMBER_OF_KEYS];
 
@@ -42,9 +45,10 @@ int transactionsCount = 0;
  * @return integer containing the hash value of the passed memory address
  */
 int AK_memory_block_hash(int blockMemoryAddress) {
-    int ret;
     AK_PRO;
-    ret = blockMemoryAddress % NUMBER_OF_KEYS;
+    uint32_t key  = (uint32_t)blockMemoryAddress;
+    uint32_t prod = key * 2654435761u;
+    int ret       = prod % NUMBER_OF_KEYS;
     AK_EPI;
     return ret;
 }
@@ -819,6 +823,40 @@ TestResult AK_test_Transaction() {
     // observable_transaction->observable->AK_notify_observers(observable_transaction->observable);
     
     memset(LockTable, 0, NUMBER_OF_KEYS * sizeof (struct transaction_list_head));
+    
+    bool interval_ok   = true;
+    bool collision_ok  = true;
+
+    for (int i = 0; i < NUMBER_OF_KEYS * 2; ++i) {
+        int h = AK_memory_block_hash(i);
+        if (h < 0 || h >= NUMBER_OF_KEYS) {
+            interval_ok = false;
+            printf("Hash out of range: key=%d -> h=%d\n", i, h);
+            break;  // možeš prekinuti čim nađeš problem
+        }
+    }
+    if (interval_ok) {
+        successfulTest++;
+    } else {
+        failedTest++;
+    }
+
+    int h0 = AK_memory_block_hash(0);
+    int h1 = AK_memory_block_hash(1);
+    if (h0 != h1) {
+        successfulTest++;
+    } else {
+        collision_ok = false;
+        failedTest++;
+        printf("Hash collision on 0 and 1: both -> %d\n", h0);
+    }
+
+
+    if (interval_ok && collision_ok) {
+        printf("HASH FUNCTION TESTS PASSED: interval i trivialna kolizija OK\n");
+    }
+
+
 
     /**************** INSERT AND UPDATE COMMAND TEST ******************/
     char *tblName = "student";
