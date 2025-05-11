@@ -16,7 +16,6 @@
  *
  * You should have received a copy of the GNU General Public License along
  * with this program.  If not, see <http://www.gnu.org/licenses/>.
- * month of may
  */
 #include "transaction.h"
 #include "../auxi/ptrcontainer.h"
@@ -38,12 +37,14 @@ int activeTransactionsCount = 0;
 int transactionsCount = 0;
 
 /**
- * @author Frane Jakelić
- * @brief Function that calculates the hash value for a given memory address. Hash values are used to identify location of locked resources.
- * @todo The current implementation is very limited it doesn't cope well with collision. recommendation use some better version of hash calculation. Maybe Knuth's memory address hashing function.
+ * @author Frane Jakelić updated by Petar Knezovic
+ * @brief Function that calculates the hash value for a given memory address via multiplicative method. Hash values are used to identify location of locked resources.
  * @param blockMemoryAddress integer representation of memory address, the hash value is calculated from this parameter.
  * @return integer containing the hash value of the passed memory address
  */
+ 
+
+ 
 int AK_memory_block_hash(int blockMemoryAddress) {
     AK_PRO;
     uint32_t key  = (uint32_t)blockMemoryAddress;
@@ -824,6 +825,11 @@ TestResult AK_test_Transaction() {
     
     memset(LockTable, 0, NUMBER_OF_KEYS * sizeof (struct transaction_list_head));
     
+    /**
+ * @author Petar Knezovic
+ * @brief Verify hash outputs stay within valid range for all inputs.
+ */
+    
     bool interval_ok   = true;
     bool collision_ok  = true;
 
@@ -832,7 +838,7 @@ TestResult AK_test_Transaction() {
         if (h < 0 || h >= NUMBER_OF_KEYS) {
             interval_ok = false;
             printf("Hash out of range: key=%d -> h=%d\n", i, h);
-            break;  // možeš prekinuti čim nađeš problem
+            break;  
         }
     }
     if (interval_ok) {
@@ -840,6 +846,12 @@ TestResult AK_test_Transaction() {
     } else {
         failedTest++;
     }
+
+
+/**
+ * @author Petar Knezovic
+ * @brief Ensure hash(0) ≠ hash(1) to catch trivial collision.
+ */
 
     int h0 = AK_memory_block_hash(0);
     int h1 = AK_memory_block_hash(1);
@@ -853,7 +865,7 @@ TestResult AK_test_Transaction() {
 
 
     if (interval_ok && collision_ok) {
-        printf("HASH FUNCTION TESTS PASSED: interval i trivialna kolizija OK\n");
+        printf("HASH FUNCTION TESTS PASSED\n");
     }
 
 
