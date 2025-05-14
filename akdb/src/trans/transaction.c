@@ -19,6 +19,13 @@
  */
 #include "transaction.h"
 #include "../auxi/ptrcontainer.h"
+#include <stdint.h>
+#include <stdbool.h>
+#include <stdlib.h>
+#include <stdio.h>
+#include <time.h>
+
+
 
 AK_transaction_list LockTable[NUMBER_OF_KEYS];
 
@@ -42,9 +49,14 @@ int transactionsCount = 0;
  * @return integer containing the hash value of the passed memory address
  */
 int AK_memory_block_hash(int blockMemoryAddress) {
-    int ret;
     AK_PRO;
-    ret = blockMemoryAddress % NUMBER_OF_KEYS;
+    uint32_t h = (uint32_t)blockMemoryAddress;
+    h ^= h >> 16;
+    h *= 0x85ebca6b;
+    h ^= h >> 13;
+    h *= 0xc2b2ae35;
+    h ^= h >> 16;
+    int ret = (int)(h % NUMBER_OF_KEYS);
     AK_EPI;
     return ret;
 }
@@ -819,6 +831,26 @@ TestResult AK_test_Transaction() {
     // observable_transaction->observable->AK_notify_observers(observable_transaction->observable);
     
     memset(LockTable, 0, NUMBER_OF_KEYS * sizeof (struct transaction_list_head));
+
+bool collision_ok = true;
+int matches = 0;
+const int SAMPLE = NUMBER_OF_KEYS * 10;
+for (int i = 0; i < SAMPLE; ++i) {
+    int h1 = AK_memory_block_hash(i);
+    int h2 = AK_memory_block_hash(i + 1);
+    if (h1 != h2) matches++;
+}
+double distinct_rate = (double)matches / SAMPLE;
+if (distinct_rate < 0.95) {
+    printf("TOO MANY COLLISIONS: only %.2f%% of adjacent pairs differ\n", distinct_rate * 100.0);
+    collision_ok = false;
+}
+if (collision_ok) {
+    successfulTest++;
+} else {
+    failedTest++;
+}
+
 
     /**************** INSERT AND UPDATE COMMAND TEST ******************/
     char *tblName = "student";
