@@ -19,6 +19,13 @@
  */
 #include "transaction.h"
 #include "../auxi/ptrcontainer.h"
+#include <stdint.h>
+#include <stdbool.h>
+#include <stdlib.h>
+#include <stdio.h>
+#include <time.h>
+
+
 
 AK_transaction_list LockTable[NUMBER_OF_KEYS];
 
@@ -35,16 +42,20 @@ int activeTransactionsCount = 0;
 int transactionsCount = 0;
 
 /**
- * @author Frane Jakelić
- * @brief Function that calculates the hash value for a given memory address. Hash values are used to identify location of locked resources.
- * @todo The current implementation is very limited it doesn't cope well with collision. recommendation use some better version of hash calculation. Maybe Knuth's memory address hashing function.
+ * @author Frane Jakelić updated by Petar Knezović
+ * @brief Function that calculates the hash value for a given memory address using MurmurHash3 algorithm. Hash values are used to identify location of locked resources.
  * @param blockMemoryAddress integer representation of memory address, the hash value is calculated from this parameter.
  * @return integer containing the hash value of the passed memory address
  */
 int AK_memory_block_hash(int blockMemoryAddress) {
-    int ret;
     AK_PRO;
-    ret = blockMemoryAddress % NUMBER_OF_KEYS;
+    uint32_t h = (uint32_t)blockMemoryAddress;
+    h ^= h >> 16;
+    h *= 0x85ebca6b;
+    h ^= h >> 13;
+    h *= 0xc2b2ae35;
+    h ^= h >> 16;
+    int ret = (int)(h % NUMBER_OF_KEYS);
     AK_EPI;
     return ret;
 }
@@ -819,6 +830,55 @@ TestResult AK_test_Transaction() {
     // observable_transaction->observable->AK_notify_observers(observable_transaction->observable);
     
     memset(LockTable, 0, NUMBER_OF_KEYS * sizeof (struct transaction_list_head));
+
+/**************** HASH FUNCTION TESTS ******************/
+
+bool collision_ok = true;
+int matches = 0;
+const int SAMPLE = NUMBER_OF_KEYS * 10;
+for (int i = 0; i < SAMPLE; ++i) {
+    int h1 = AK_memory_block_hash(i);
+    int h2 = AK_memory_block_hash(i + 1);
+    if (h1 != h2) matches++;
+}
+double distinct_rate = (double)matches / SAMPLE;
+if (distinct_rate < 0.95) {
+    printf("TOO MANY COLLISIONS: only %.2f%% of adjacent pairs differ\n", distinct_rate * 100.0);
+    collision_ok = false;
+}
+if (collision_ok) {
+    successfulTest++;
+} else {
+    failedTest++;
+}
+
+
+
+bool range_ok = true;
+for (int i = 0; i < 10; ++i) {
+    int h1 = AK_memory_block_hash(i);
+    int h2 = AK_memory_block_hash(i);
+    if (h1 < 0 || h1 >= NUMBER_OF_KEYS) {
+        range_ok = false;
+        break;
+    }
+    if (h1 != h2) {
+        range_ok = false;
+        break;
+    }
+}
+
+int hA = AK_memory_block_hash(0x12345678);
+int hB = AK_memory_block_hash(0x87654321);
+if (hA == hB) range_ok = false;
+
+if (range_ok) {
+    successfulTest++;
+} else {
+    failedTest++;
+    printf("Hash range/determinism test failed: h(i) out of bounds or non-deterministic/colliding\n");
+}
+
 
     /**************** INSERT AND UPDATE COMMAND TEST ******************/
     char *tblName = "student";
